@@ -279,17 +279,13 @@ function playChannel(idx){
 
 // === KONFIGURACE ===
 // Sem vloz URL sveho Cloudflare Workeru:
-var CF_WORKER = 'https://oneprime.tobias-kubanek.workers.dev/';
+var CF_WORKER = 'https://oneprime.tobias-kubanek.workers.dev';
 // ===================
 
 function getProxyUrl(url) {
-  // Na HTTPS (Pages.dev) vsechno pres Worker, na HTTP (localhost) pres lokalni proxy
   var isHttps = location.protocol === 'https:';
-  if (isHttps) {
-    return CF_WORKER + '/proxy?url=' + encodeURIComponent(url);
-  } else {
-    return 'http://localhost:8080/proxy?url=' + encodeURIComponent(url);
-  }
+  var base = isHttps ? CF_WORKER.replace(/\/+$/, '') : 'http://localhost:8080';
+  return base + '/proxy?url=' + encodeURIComponent(url);
 }
 
 function needsProxy(url) {
@@ -437,7 +433,7 @@ function loadEpg(title,tvgId){
   _epgQueue.push({title:title,tvgId:tvgId});
   if(_epgLoading) return;
   _epgLoading=true;
-  var epgUrl=EPG_URL||'http://193.109.193.16:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
+  var epgUrl=EPG_URL||'http://mojetv.blogsite.org:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
   var epgFetchUrl = location.protocol==='https:' ? getProxyUrl(epgUrl) : epgUrl;
   fetch(epgFetchUrl).then(function(r){return r.text();}).then(function(xml){
     _epgCache=xml; _epgLoading=false;
