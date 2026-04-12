@@ -121,8 +121,9 @@ video{width:100%;height:100%;display:block;background:#000}
   </div>
 </div>
 <script>
-// ---- Konfigurace ----
-var PLAYLIST_URL = 'playlist.m3u';
+// === CLOUDFLARE WORKER PROXY - vsechny requesty jdou pres tuto URL ===
+var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
+
 
 // ---- Stav ----
 var CH = [];
@@ -301,12 +302,14 @@ function doPlay(url){
 
   function startNew(){
     _playPending = false;
-    var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
     // VOD/serialy: url konci .mp4 apod. NEBO kanal patri do skupiny vod/series
     var currentCh = CH.find(function(c){ return c.u===url; });
     var isVodGroup = currentCh && /^(vod|series|vod-|serie)/i.test(currentCh.g);
     var isDirectVideo = isVodGroup || url.match(/\.(mp4|mkv|webm|avi)(\?|$)/i);
     if(isDirectVideo){
+      // Nejdriv zkus primy fetch bez proxy (nektera VOD servery maji CORS)
+      // Pokud selze, pouzij proxy
+      // Cloudflare Worker proxy pro VOD (nastav svou Worker URL)
       var proxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(url);
       video.src = proxyUrl;
       video.load();
@@ -314,7 +317,7 @@ function doPlay(url){
         hideOverlay(); showCtrlBar();
       }).catch(function(e){
         if(e&&e.name==='AbortError') return;
-        hideOverlay(); showErr('Nelze p\u0159ehr\u00e1t film.');
+        hideOverlay(); showErr('Nelze p\u0159ehr\u00e1t film. Zkontroluj \u017ee proxy b\u011b\u017e\u00ed (spust_server.bat).');
       });
       video.onerror = function(){ hideOverlay(); showErr('Chyba na\u010d\u00edt\u00e1n\u00ed videa p\u0159es proxy.'); };
       return;
@@ -322,9 +325,7 @@ function doPlay(url){
     if(!mpegts.getFeatureList().mseLivePlayback){
       hideOverlay(); showErr('Prohl\u00ed\u017ee\u010d nepodporuje MPEG-TS.'); return;
     }
-    // Live TV - vzdy pres CF Worker proxy (HTTPS)
-    var liveProxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(url);
-    player = mpegts.createPlayer({type:'mpegts',url:liveProxyUrl,isLive:true},{
+    player = mpegts.createPlayer({type:'mpegts',url:CF_PROXY+'/proxy?url='+encodeURIComponent(url),isLive:true},{
       enableWorker:true,
       lazyLoadMaxDuration:3,
       lazyLoadRecoverDuration:1,
@@ -410,10 +411,8 @@ function loadEpg(title,tvgId){
   _epgQueue.push({title:title,tvgId:tvgId});
   if(_epgLoading) return;
   _epgLoading=true;
-  var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
   var epgUrl=EPG_URL||'http://193.109.193.16:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
-  var epgProxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(epgUrl);
-  fetch(epgProxyUrl).then(function(r){return r.text();}).then(function(xml){
+  fetch(CF_PROXY+'/proxy?url='+encodeURIComponent(epgUrl)).then(function(r){return r.text();}).then(function(xml){
     _epgCache=xml; _epgLoading=false;
     var last=_epgQueue[_epgQueue.length-1]; _epgQueue=[];
     parseEpg(xml,last.title,last.tvgId);
