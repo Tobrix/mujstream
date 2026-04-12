@@ -309,7 +309,7 @@ function doPlay(url){
       // Nejdriv zkus primy fetch bez proxy (nektera VOD servery maji CORS)
       // Pokud selze, pouzij proxy
       // Cloudflare Worker proxy pro VOD (nastav svou Worker URL)
-      var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
+      var CF_PROXY = 'https://mujstream-proxy.YOUR-SUBDOMAIN.workers.dev';
       var proxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(url);
       video.src = proxyUrl;
       video.load();
@@ -325,7 +325,7 @@ function doPlay(url){
     if(!mpegts.getFeatureList().mseLivePlayback){
       hideOverlay(); showErr('Prohl\u00ed\u017ee\u010d nepodporuje MPEG-TS.'); return;
     }
-    player = mpegts.createPlayer({type:'mpegts',url:CF_PROXY+'/proxy?url='+encodeURIComponent(url),isLive:true},{
+    player = mpegts.createPlayer({type:'mpegts',url:url,isLive:true},{
       enableWorker:true,
       lazyLoadMaxDuration:3,
       lazyLoadRecoverDuration:1,
@@ -411,8 +411,8 @@ function loadEpg(title,tvgId){
   _epgQueue.push({title:title,tvgId:tvgId});
   if(_epgLoading) return;
   _epgLoading=true;
-  var epgUrl=EPG_URL||'http://epg.oneprime.site:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
-  fetch(CF_PROXY+'/proxy?url='+encodeURIComponent(epgUrl)).then(function(r){return r.text();}).then(function(xml){
+  var epgUrl=EPG_URL||'http://193.109.193.16:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
+  fetch(epgUrl).then(function(r){return r.text();}).then(function(xml){
     _epgCache=xml; _epgLoading=false;
     var last=_epgQueue[_epgQueue.length-1]; _epgQueue=[];
     parseEpg(xml,last.title,last.tvgId);
