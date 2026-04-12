@@ -277,6 +277,30 @@ function playChannel(idx){
   doPlay(ch.u);
 }
 
+// === KONFIGURACE ===
+// Sem vloz URL sveho Cloudflare Workeru:
+var CF_WORKER = 'https://oneprime.tobias-kubanek.workers.dev/';
+// ===================
+
+function getProxyUrl(url) {
+  // Na HTTPS (Pages.dev) vsechno pres Worker, na HTTP (localhost) pres lokalni proxy
+  var isHttps = location.protocol === 'https:';
+  if (isHttps) {
+    return CF_WORKER + '/proxy?url=' + encodeURIComponent(url);
+  } else {
+    return 'http://localhost:8080/proxy?url=' + encodeURIComponent(url);
+  }
+}
+
+function needsProxy(url) {
+  // HTTP streamy na HTTPS strance VZDY potrebuji proxy
+  if (location.protocol === 'https:' && url.startsWith('http:')) return true;
+  // VOD skupiny vzdy pres proxy
+  var ch = CH.find(function(c){ return c.u === url; });
+  if (ch && /^(vod|series)/i.test(ch.g)) return true;
+  return false;
+}
+
 var _playPending = false;
 function doPlay(url){
   if(_playPending) return;
@@ -301,27 +325,29 @@ function doPlay(url){
 
   function startNew(){
     _playPending = false;
-    // VOD/serialy: url konci .mp4 apod. NEBO kanal patri do skupiny vod/series
     var currentCh = CH.find(function(c){ return c.u===url; });
-    var isVodGroup = currentCh && /^(vod|series|vod-|serie)/i.test(currentCh.g);
+    var isVodGroup = currentCh && /^(vod|series)/i.test(currentCh.g);
     var isDirectVideo = isVodGroup || url.match(/\.(mp4|mkv|webm|avi)(\?|$)/i);
+
+    // Na HTTPS (Pages): vsechno HTTP musi jit pres Worker proxy
+    var onHttps = location.protocol === 'https:';
+    var streamUrl = (onHttps || isDirectVideo) ? getProxyUrl(url) : url;
+
     if(isDirectVideo){
-      // Nejdriv zkus primy fetch bez proxy (nektera VOD servery maji CORS)
-      // Pokud selze, pouzij proxy
-      // Cloudflare Worker proxy pro VOD (nastav svou Worker URL)
-      var CF_PROXY = 'https://mujstream-proxy.YOUR-SUBDOMAIN.workers.dev';
-      var proxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(url);
-      video.src = proxyUrl;
+      video.src = streamUrl;
       video.load();
       video.play().then(function(){
         hideOverlay(); showCtrlBar();
       }).catch(function(e){
         if(e&&e.name==='AbortError') return;
-        hideOverlay(); showErr('Nelze p\u0159ehr\u00e1t film. Zkontroluj \u017ee proxy b\u011b\u017e\u00ed (spust_server.bat).');
+        hideOverlay(); showErr('Nelze p\u0159ehr\u00e1t film. Worker URL: ' + CF_WORKER);
       });
-      video.onerror = function(){ hideOverlay(); showErr('Chyba na\u010d\u00edt\u00e1n\u00ed videa p\u0159es proxy.'); };
+      video.onerror = function(){ hideOverlay(); showErr('Chyba na\u010d\u00edt\u00e1n\u00ed videa.'); };
       return;
     }
+
+    // Live TV na HTTPS - pres Worker
+    if(onHttps){ url = streamUrl; }
     if(!mpegts.getFeatureList().mseLivePlayback){
       hideOverlay(); showErr('Prohl\u00ed\u017ee\u010d nepodporuje MPEG-TS.'); return;
     }
@@ -412,7 +438,8 @@ function loadEpg(title,tvgId){
   if(_epgLoading) return;
   _epgLoading=true;
   var epgUrl=EPG_URL||'http://193.109.193.16:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
-  fetch(epgUrl).then(function(r){return r.text();}).then(function(xml){
+  var epgFetchUrl = location.protocol==='https:' ? getProxyUrl(epgUrl) : epgUrl;
+  fetch(epgFetchUrl).then(function(r){return r.text();}).then(function(xml){
     _epgCache=xml; _epgLoading=false;
     var last=_epgQueue[_epgQueue.length-1]; _epgQueue=[];
     parseEpg(xml,last.title,last.tvgId);
