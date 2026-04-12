@@ -301,9 +301,9 @@ function doPlay(url){
 
   function startNew(){
     _playPending = false;
+    var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
     // VOD/serialy: url konci .mp4 apod. NEBO kanal patri do skupiny vod/series
     var currentCh = CH.find(function(c){ return c.u===url; });
-    var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
     var isVodGroup = currentCh && /^(vod|series|vod-|serie)/i.test(currentCh.g);
     var isDirectVideo = isVodGroup || url.match(/\.(mp4|mkv|webm|avi)(\?|$)/i);
     if(isDirectVideo){
@@ -314,17 +314,17 @@ function doPlay(url){
         hideOverlay(); showCtrlBar();
       }).catch(function(e){
         if(e&&e.name==='AbortError') return;
-        hideOverlay(); showErr('Nelze p\u0159ehr\u00e1t film. Zkontroluj \u017ee proxy b\u011b\u017e\u00ed (spust_server.bat).');
+        hideOverlay(); showErr('Nelze p\u0159ehr\u00e1t film.');
       });
       video.onerror = function(){ hideOverlay(); showErr('Chyba na\u010d\u00edt\u00e1n\u00ed videa p\u0159es proxy.'); };
       return;
     }
-    // Vsechny streamy pres Cloudflare Worker (HTTPS proxy)
-    var liveUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(url);
     if(!mpegts.getFeatureList().mseLivePlayback){
       hideOverlay(); showErr('Prohl\u00ed\u017ee\u010d nepodporuje MPEG-TS.'); return;
     }
-    player = mpegts.createPlayer({type:'mpegts',url:liveUrl,isLive:true},{
+    // Live TV - vzdy pres CF Worker proxy (HTTPS)
+    var liveProxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(url);
+    player = mpegts.createPlayer({type:'mpegts',url:liveProxyUrl,isLive:true},{
       enableWorker:true,
       lazyLoadMaxDuration:3,
       lazyLoadRecoverDuration:1,
@@ -411,7 +411,7 @@ function loadEpg(title,tvgId){
   if(_epgLoading) return;
   _epgLoading=true;
   var CF_PROXY = 'https://oneprime.tobias-kubanek.workers.dev';
-  var epgUrl = EPG_URL || 'http://193.109.193.16:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
+  var epgUrl=EPG_URL||'http://193.109.193.16:4300/xml/sejviczthoms/SejviCZthoms1122@/epg.xml';
   var epgProxyUrl = CF_PROXY + '/proxy?url=' + encodeURIComponent(epgUrl);
   fetch(epgProxyUrl).then(function(r){return r.text();}).then(function(xml){
     _epgCache=xml; _epgLoading=false;
